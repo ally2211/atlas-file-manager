@@ -8,6 +8,42 @@ const { ObjectId } = require('mongodb');
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 
 class FilesController {
+  static async getFile(req, res) {
+    const token = req.headers['x-token'];
+    const fileId = req.params.id;
+
+    let file;
+    try {
+      file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(fileId) });
+      if (!file) return res.status(404).json({ error: 'Not found' });
+    } catch (error) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    // Check if the file is a folder
+    if (file.type === 'folder') {
+      return res.status(400).json({ error: "A folder doesn't have content" });
+    }
+
+    // Check if the file is public or if the user is authorized
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!file.isPublic && (!userId || userId !== file.userId.toString())) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    // Check if the file exists on the local system
+    if (!fs.existsSync(file.localPath)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    // Get the MIME type and serve the file content
+    const mimeType = mime.lookup(file.name);
+    res.setHeader('Content-Type', mimeType);
+
+    const fileStream = fs.createReadStream(file.localPath);
+    fileStream.pipe(res);
+  }
+
   static async putPublish(req, res) {
     const token = req.headers['x-token'];
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
