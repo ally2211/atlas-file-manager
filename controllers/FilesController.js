@@ -4,7 +4,11 @@ const { v4: uuidv4 } = require('uuid');
 const redisClient = require('../utils/redis');
 const dbClient = require('../utils/db');
 const { ObjectId } = require('mongodb');
+const mime = require('mime-types');
+const Bull = require('bull');
 
+
+const fileQueue = new Bull('fileQueue');
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 
 class FilesController {
