@@ -36,8 +36,18 @@ class FilesController {
     }
 
     // Check if the file exists on the local system
-    if (!fs.existsSync(file.localPath)) {
-      return res.status(404).json({ error: 'Not found' });
+    //if (!fs.existsSync(file.localPath)) {
+      //return res.status(404).json({ error: 'Not found' });
+    //}
+   // Determine the file path based on size
+    let filePath = file.localPath;
+    if (size && ['500', '250', '100'].includes(size)) {
+        const sizedFilePath = `${file.localPath}_${size}`;
+        if (fs.existsSync(sizedFilePath)) {
+        filePath = sizedFilePath;
+        } else {
+        return res.status(404).json({ error: 'Not found' });
+        }
     }
 
     // Get the MIME type and serve the file content
@@ -208,6 +218,12 @@ class FilesController {
       
       // Save file to DB
       const result = await dbClient.db.collection('files').insertOne(fileDocument);
+      
+        // Add job to queue for image files
+        if (type === 'image') {
+            fileQueue.add({ userId, fileId: result.insertedId.toString() });
+        }
+        
       return res.status(201).json({ id: result.insertedId, ...fileDocument });
     }
   }
